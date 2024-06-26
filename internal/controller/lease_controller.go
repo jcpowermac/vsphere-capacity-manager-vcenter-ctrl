@@ -22,6 +22,7 @@ import (
 	"path"
 	"sync"
 
+	"github.com/fatih/color"
 	"github.com/go-logr/logr"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -90,7 +91,9 @@ func (r *LeaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			leaseCopy = nil
 
 		} else {
+			color.Set(color.FgRed)
 			logger.Info(fmt.Sprintf("potentially did not clean up deleted lease %s", req.NamespacedName))
+			color.Unset()
 		}
 
 		return ctrl.Result{}, nil
@@ -159,7 +162,9 @@ func checkLeasedNetworkForLeakedVirtualMachines(ctx context.Context, lease *v1.L
 
 									// if the lease was created _after_ the virtual machines then they probably shouldn't be there right?
 									if leaseDeleted || lease.CreationTimestamp.Time.After(*vm.Config.CreateDate) {
+										color.Set(color.FgGreen)
 										logger.Info(fmt.Sprintf("destroying virtual machine %s uptime %d created %s", vm.Name, vm.Summary.QuickStats.UptimeSeconds, vm.Config.CreateDate.String()))
+										color.Unset()
 
 										if err := deleteVirtualMachine(ctx, s, vm.Reference()); err != nil {
 											return err
