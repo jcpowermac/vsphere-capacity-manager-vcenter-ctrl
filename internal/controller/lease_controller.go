@@ -26,6 +26,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
+	"github.com/vmware/govmomi/fault"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/view"
@@ -326,14 +327,20 @@ func (r *LeaseReconciler) deleteVirtualMachine(ctx context.Context, server strin
 		faultMsg := extractFaultMessageFromErr(err)
 		r.logger.Error(err, "destroy virtual machine", "name", objName, "fault_message", faultMsg)
 
-		switch {
-		case strings.Contains(err.Error(), "Invalid virtual machine state."):
+		invalidVmState := types.InvalidVmState{}
+		if localizedMessage, ok := fault.As(err, &invalidVmState); ok {
+			r.logger.Error(err, "invalid virtual machine state", "name", objName, "localized_message", localizedMessage)
 			return nil
-		case strings.Contains(err.Error(), "Permission to perform this operation was denied"):
-			return nil
-		default:
-			return err
 		}
+
+		types.NoPermission{}
+
+		if strings.Contains(err.Error(), "Invalid virtual machine state") ||
+			strings.Contains(err.Error(), "Permission to perform this operation was denied") {
+			return nil
+		}
+
+		return err
 	}
 	if err := destroyTask.Wait(ctx); err != nil {
 		faultMsg := extractFaultMessageFromErr(err)
